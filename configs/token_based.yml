@@ -1,0 +1,8 @@
+- data_path: tokenized/fineweb-en-sample
+  name: fineweb_en
+  original_prob: null
+  weight: 0.94
+- data_path: tokenized/fineweb-2-ko-sample
+  name: fineweb_ko
+  original_prob: null
+  weight: 0.06
