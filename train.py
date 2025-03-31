@@ -746,7 +746,7 @@ def main():
 
             model.eval()
             losses = []
-            for step, batch in enumerate(eval_dataloader):
+            for step, batch in enumerate(tqdm(eval_dataloader, disable= not accelerator.is_main_process)):
                 with torch.no_grad():
                     outputs = model(**batch)
 
@@ -801,6 +801,7 @@ def main():
             total_loss = 0
         active_dataloader = train_dataloader
         for step, batch in enumerate(active_dataloader):
+            print(f'step - {step}')
             with accelerator.accumulate(model):
                 if batch.get('labels') is None:
                     batch['labels'] = batch['input_ids'].clone()
@@ -821,7 +822,7 @@ def main():
                 completed_steps += 1
 
             if isinstance(checkpointing_steps, int):
-                if completed_steps % checkpointing_steps == 0 and accelerator.sync_gradients:
+                if completed_steps % checkpointing_steps == 0 and accelerator.sync_gradients and completed_steps > 1:
                     output_dir = f"step_{completed_steps}"
                     if args.output_dir is not None:
                         output_dir = os.path.join(args.output_dir, output_dir)
@@ -841,10 +842,10 @@ def main():
             if completed_steps >= args.max_train_steps:
                 break
 
-            if completed_steps % args.evaluation_steps == 0:
+            if completed_steps % args.evaluation_steps == 0 and completed_steps > 1:
                 model.eval()
                 losses = []
-                for step, batch in enumerate(eval_dataloader):
+                for step, batch in enumerate(tqdm(eval_dataloader, disable=not accelerator.is_main_process)):
                     with torch.no_grad():
                         if batch.get('labels') is None:
                             batch['labels'] = batch['input_ids'].clone()
