@@ -182,6 +182,11 @@ def parse_args():
         choices=MODEL_TYPES,
     )
     parser.add_argument(
+        "--flash_attn",
+         action="store_true",
+    )
+    
+    parser.add_argument(
         "--block_size",
         type=int,
         default=None,
@@ -478,16 +483,30 @@ def main():
         )
 
     if args.model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
+        if args.flash_attn:
+            model = AutoModelForCausalLM.from_pretrained(
             args.model_name_or_path,
             from_tf=bool(".ckpt" in args.model_name_or_path),
             config=config,
             low_cpu_mem_usage=args.low_cpu_mem_usage,
             trust_remote_code=args.trust_remote_code,
+            torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2"
         )
+        else:
+                model = AutoModelForCausalLM.from_pretrained(
+            args.model_name_or_path,
+            from_tf=bool(".ckpt" in args.model_name_or_path),
+            config=config,
+            low_cpu_mem_usage=args.low_cpu_mem_usage,
+            trust_remote_code=args.trust_remote_code,
+            )
+        
     else:
         logger.info("Training new model from scratch")
-        model = AutoModelForCausalLM.from_config(config, trust_remote_code=args.trust_remote_code)
+        if args.flash_attn:
+            model = AutoModelForCausalLM.from_config(config, trust_remote_code=args.trust_remote_code, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+        else:
+            model = AutoModelForCausalLM.from_config(config, trust_remote_code=args.trust_remote_code)
 
     # We resize the embeddings only when necessary to avoid index errors. If you are creating a model from scratch
     # on a small vocab and want a smaller embedding size, remove this test.
@@ -597,7 +616,9 @@ def main():
             args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
     
-    
+    scheduler_specific_kwargs = None
+    if args.lr_scheduler_type == 'cosine_with_min_lr':
+        scheduler_specific_kwargs = {'min_lr': args.min_learning_rate}
     lr_scheduler = get_scheduler(
         name=args.lr_scheduler_type,
         optimizer=optimizer,
@@ -605,6 +626,7 @@ def main():
         num_training_steps=args.max_train_steps
         if overrode_max_train_steps
         else args.max_train_steps * accelerator.num_processes,
+        scheduler_specific_kwargs=scheduler_specific_kwargs
     )
 
     # Prepare everything with our `accelerator`.
