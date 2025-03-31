@@ -780,7 +780,8 @@ def main():
         active_dataloader = train_dataloader
         for step, batch in enumerate(active_dataloader):
             with accelerator.accumulate(model):
-                print(batch)
+                if batch.get('labels') is None:
+                    batch['labels'] = batch['input_ids'].clone()
                 outputs = model(**batch)
                 loss = outputs.loss
                 # We keep track of the loss at each epoch
@@ -823,6 +824,8 @@ def main():
                 losses = []
                 for step, batch in enumerate(eval_dataloader):
                     with torch.no_grad():
+                        if batch.get('labels') is None:
+                            batch['labels'] = batch['input_ids'].clone()
                         outputs = model(**batch)
                         loss = outputs.loss
                         losses.append(accelerator.gather_for_metrics(loss.repeat(args.per_device_eval_batch_size)))
