@@ -800,7 +800,7 @@ def main():
         if args.with_tracking:
             total_loss = 0
         active_dataloader = train_dataloader
-        for step, batch in enumerate(active_dataloader):
+        for step, batch in enumerate(tqdm(active_dataloader, disable=not accelerator.is_main_process)):
             print(f'step - {step}')
             with accelerator.accumulate(model):
                 if batch.get('labels') is None:
@@ -860,14 +860,14 @@ def main():
                 except OverflowError:
                     perplexity = float("inf")
 
-                logger.info(f"epoch {epoch}: perplexity: {perplexity} eval_loss: {eval_loss}")
+                logger.info(f"completed_steps {completed_steps}: perplexity: {perplexity} eval_loss: {eval_loss}")
 
                 if args.with_tracking:
                     accelerator.log(
                         {
                             "perplexity": perplexity,
                             "eval_loss": eval_loss,
-                            "train_loss": total_loss.item() / len(train_dataloader),
+                            "train_loss": total_loss.item() / completed_steps,
                             "epoch": epoch,
                             "step": completed_steps,
                         },
